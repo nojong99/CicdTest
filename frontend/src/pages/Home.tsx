@@ -16,7 +16,7 @@ const Home: React.FC = () => {
         </ul>
         <div style={{ marginTop: '20px' }}>
           <Link to="/posts" className="btn btn-primary" style={{ marginRight: '10px' }}>
-            게시글 목록 보기
+            게시글 목록 확인하기
           </Link>
           <Link to="/signup" className="btn btn-primary">
             회원가입
