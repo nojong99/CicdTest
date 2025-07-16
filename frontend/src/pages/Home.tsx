@@ -6,7 +6,7 @@ const Home: React.FC = () => {
     <div className="main-content">
       <div className="card">
         <h1>게시판 앱에 오신 것을 환영합니다!</h1>
-        <p>이 애플리케이션은 Spring Boot와 React를 사용하여 만든 게시판입니다.</p>
+        <p>이 애플리케이션은 Spring Boot와 React</p>
         <p>다음 기능들을 사용할 수 있습니다:</p>
         <ul>
           <li>회원가입 및 로그인</li>

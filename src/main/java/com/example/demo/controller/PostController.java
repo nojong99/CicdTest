@@ -1,7 +1,6 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.PostDto;
-import com.example.demo.security.JwtTokenProvider;
 import com.example.demo.service.PostService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -19,11 +18,9 @@ import java.util.Map;
 public class PostController {
     
     private final PostService postService;
-    private final JwtTokenProvider tokenProvider;
     
-    public PostController(PostService postService, JwtTokenProvider tokenProvider) {
+    public PostController(PostService postService) {
         this.postService = postService;
-        this.tokenProvider = tokenProvider;
     }
     
     @GetMapping
@@ -52,12 +49,10 @@ public class PostController {
     }
     
     @PostMapping
-    public ResponseEntity<?> createPost(@Valid @RequestBody PostDto.CreateRequest request,
-                                       @RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> createPost(@Valid @RequestBody PostDto.CreateRequest request) {
         try {
-            String jwt = token.substring(7);
-            String username = tokenProvider.getUsernameFromToken(jwt);
-            PostDto.PostResponse post = postService.createPost(request, username);
+            // 임시로 고정 사용자명 사용
+            PostDto.PostResponse post = postService.createPost(request, "admin");
             return ResponseEntity.ok(post);
         } catch (Exception e) {
             Map<String, String> error = new HashMap<>();
@@ -68,12 +63,9 @@ public class PostController {
     
     @PutMapping("/{id}")
     public ResponseEntity<?> updatePost(@PathVariable Long id,
-                                       @Valid @RequestBody PostDto.UpdateRequest request,
-                                       @RequestHeader("Authorization") String token) {
+                                       @Valid @RequestBody PostDto.UpdateRequest request) {
         try {
-            String jwt = token.substring(7);
-            String username = tokenProvider.getUsernameFromToken(jwt);
-            PostDto.PostResponse post = postService.updatePost(id, request, username);
+            PostDto.PostResponse post = postService.updatePost(id, request, "admin");
             return ResponseEntity.ok(post);
         } catch (Exception e) {
             Map<String, String> error = new HashMap<>();
@@ -83,12 +75,9 @@ public class PostController {
     }
     
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deletePost(@PathVariable Long id,
-                                       @RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> deletePost(@PathVariable Long id) {
         try {
-            String jwt = token.substring(7);
-            String username = tokenProvider.getUsernameFromToken(jwt);
-            postService.deletePost(id, username);
+            postService.deletePost(id, "admin");
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             Map<String, String> error = new HashMap<>();
