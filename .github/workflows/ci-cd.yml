@@ -1,15 +1,10 @@
-name: CI/CD Pipeline - Azure
+name: CI/CD Pipeline - Local
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-
-env:
-  AZURE_REGISTRY: ${{ secrets.AZURE_REGISTRY }}
-  AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
-  AZURE_LOCATION: ${{ secrets.AZURE_LOCATION }}
 
 jobs:
   test:
@@ -44,7 +39,7 @@ jobs:
         chmod +x ./gradlew
         ./gradlew test
 
-  build-and-push-to-acr:
+  build-and-push:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -61,106 +56,67 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
     
-    - name: Login to Azure Container Registry
-      uses: azure/docker-login@v1
-      with:
-        login-server: ${{ env.AZURE_REGISTRY }}.azurecr.io
-        username: ${{ secrets.AZURE_REGISTRY_USERNAME }}
-        password: ${{ secrets.AZURE_REGISTRY_PASSWORD }}
-    
-    - name: Build and Push Backend Docker image
+    - name: Build Backend Docker image
       uses: docker/build-push-action@v4
       with:
         context: .
-        push: true
-        tags: ${{ env.AZURE_REGISTRY }}.azurecr.io/board-backend:${{ github.sha }}
+        push: false
+        tags: cicdtest-backend:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
     
-    - name: Build and Push Frontend Docker image
+    - name: Build Frontend Docker image
       uses: docker/build-push-action@v4
       with:
         context: ./frontend
-        push: true
-        tags: ${{ env.AZURE_REGISTRY }}.azurecr.io/board-frontend:${{ github.sha }}
+        push: false
+        tags: cicdtest-frontend:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-  deploy-to-azure:
-    needs: build-and-push-to-acr
+  deploy:
+    needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     
     steps:
     - uses: actions/checkout@v3
     
-    - name: Azure Login
-      uses: azure/login@v1
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Load Backend Docker image
+      uses: docker/build-push-action@v4
       with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        context: .
+        load: true
+        tags: cicdtest-backend:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
     
-    - name: Deploy Backend to Azure Container Instances
-      run: |
-        az container create \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --name board-backend \
-          --image ${{ env.AZURE_REGISTRY }}.azurecr.io/board-backend:${{ github.sha }} \
-          --dns-name-label board-backend-${{ github.run_number }} \
-          --ports 8080 \
-          --registry-login-server ${{ env.AZURE_REGISTRY }}.azurecr.io \
-          --registry-username ${{ secrets.AZURE_REGISTRY_USERNAME }} \
-          --registry-password ${{ secrets.AZURE_REGISTRY_PASSWORD }} \
-          --environment-variables \
-            SPRING_PROFILES_ACTIVE=prod \
-            SPRING_DATASOURCE_URL=jdbc:h2:mem:testdb \
-            SPRING_DATASOURCE_DRIVERCLASSNAME=org.h2.Driver \
-            SPRING_DATASOURCE_USERNAME=sa \
-            SPRING_DATASOURCE_PASSWORD= \
-            SPRING_H2_CONSOLE_ENABLED=true \
-            SPRING_JPA_HIBERNATE_DDL_AUTO=create-drop \
-            SPRING_JPA_SHOW_SQL=true \
-            JWT_SECRET=your-secret-key-here \
-            JWT_EXPIRATION=86400000 \
-          --restart-policy Always
+    - name: Load Frontend Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: ./frontend
+        load: true
+        tags: cicdtest-frontend:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
     
-    - name: Deploy Frontend to Azure Container Instances
+    - name: Run Backend Container
       run: |
-        az container create \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --name board-frontend \
-          --image ${{ env.AZURE_REGISTRY }}.azurecr.io/board-frontend:${{ github.sha }} \
-          --dns-name-label board-frontend-${{ github.run_number }} \
-          --ports 3000 \
-          --registry-login-server ${{ env.AZURE_REGISTRY }}.azurecr.io \
-          --registry-username ${{ secrets.AZURE_REGISTRY_USERNAME }} \
-          --registry-password ${{ secrets.AZURE_REGISTRY_PASSWORD }} \
-          --environment-variables \
-            REACT_APP_API_URL=http://board-backend-${{ github.run_number }}.${{ env.AZURE_LOCATION }}.azurecontainer.io:8080 \
-          --restart-policy Always
+        docker run -d --name backend -p 8080:8080 cicdtest-backend:latest
+        echo "Backend container started on port 8080"
     
-    - name: Get Backend URL
+    - name: Run Frontend Container
       run: |
-        BACKEND_URL=$(az container show \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --name board-backend \
-          --query "ipAddress.fqdn" \
-          --output tsv)
-        echo "Backend URL: http://$BACKEND_URL:8080"
-        echo "BACKEND_URL=http://$BACKEND_URL:8080" >> $GITHUB_ENV
+        docker run -d --name frontend -p 3000:3000 cicdtest-frontend:latest
+        echo "Frontend container started on port 3000"
     
-    - name: Get Frontend URL
+    - name: Check container status
       run: |
-        FRONTEND_URL=$(az container show \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --name board-frontend \
-          --query "ipAddress.fqdn" \
-          --output tsv)
-        echo "Frontend URL: http://$FRONTEND_URL:3000"
-        echo "FRONTEND_URL=http://$FRONTEND_URL:3000" >> $GITHUB_ENV
-    
-    - name: Deployment Summary
-      run: |
-        echo "🚀 Deployment completed successfully!"
-        echo "📱 Frontend: ${{ env.FRONTEND_URL }}"
-        echo "🔧 Backend: ${{ env.BACKEND_URL }}"
-        echo "📊 H2 Console: ${{ env.BACKEND_URL }}/h2-console" 
+        docker ps
+        echo "Containers are running!"
+        echo "Backend: http://localhost:8080"
+        echo "Frontend: http://localhost:3000"
+        echo "Note: These containers are running on GitHub Actions runners and are not accessible from your local machine." 
