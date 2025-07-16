@@ -3,6 +3,4 @@
 README.md
 Dockerfile
 docker-compose.yml
-.gradle
-build
-!build/libs/*.jar 
+frontend 
