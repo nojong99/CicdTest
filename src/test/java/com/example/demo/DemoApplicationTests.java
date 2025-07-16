@@ -9,7 +9,7 @@ import org.springframework.test.context.TestPropertySource;
     "spring.cloud.config.enabled=false",
     "spring.cloud.discovery.enabled=false",
     "spring.kafka.bootstrap-servers=localhost:9092",
-    "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration"
+    "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration,org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration,org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration"
 })
 class DemoApplicationTests {
 
